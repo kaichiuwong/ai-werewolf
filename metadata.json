@@ -1,0 +1,5 @@
+{
+  "name": "AI 狼人殺 (Werewolf AI Host)",
+  "description": "一個由 Google Gemini AI 擔任主持人的狼人殺遊戲。支援 6-18 人，不足人數由 AI 電腦玩家補位。包含預言家、女巫、獵人等經典角色。",
+  "requestFramePermissions": []
+}
