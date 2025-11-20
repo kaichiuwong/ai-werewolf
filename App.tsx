@@ -89,6 +89,7 @@ const App: React.FC = () => {
 
   // Help Modal State
   const [showHelp, setShowHelp] = useState(false);
+  const [viewingHelpRole, setViewingHelpRole] = useState<Role>(Role.VILLAGER);
   
   // Game Over Result Modal State
   const [showResultModal, setShowResultModal] = useState(false);
@@ -115,6 +116,14 @@ const App: React.FC = () => {
     setAvatarOptions(options);
     setSelectedAvatar(options[0]);
   };
+
+  // Sync viewing role with human role when game starts
+  useEffect(() => {
+    const human = state.players.find(p => p.id === state.humanPlayerId);
+    if (human) {
+      setViewingHelpRole(human.role);
+    }
+  }, [state.humanPlayerId, state.players]);
 
   // Auto scroll logs
   useEffect(() => {
@@ -611,13 +620,77 @@ const App: React.FC = () => {
             >
               開始遊戲
             </Button>
+
+             <div className="text-center">
+                <Button variant="ghost" onClick={() => setShowHelp(true)} isNight={true} className="text-sm">
+                   <BookOpen size={14} className="mr-2 inline" /> 查看所有角色說明
+                </Button>
+             </div>
           </div>
         </div>
+
+        {/* Setup Phase Help Modal */}
+         <Modal 
+            isOpen={showHelp} 
+            onClose={() => setShowHelp(false)} 
+            title="遊戲角色指南"
+            isNight={true}
+          >
+            <div className="space-y-4">
+              <div className="flex flex-wrap gap-2 pb-2 border-b border-slate-700/20">
+                {(Object.values(Role) as Role[]).map(r => (
+                  <button 
+                    key={r}
+                    onClick={() => setViewingHelpRole(r)}
+                    className={`px-3 py-1 rounded-full text-xs font-bold transition-all ${
+                      viewingHelpRole === r 
+                      ? 'bg-amber-500 text-white shadow-md' 
+                      : 'bg-slate-800 text-slate-400 hover:bg-slate-700'
+                    }`}
+                  >
+                    {ROLE_DETAILS[r].name}
+                  </button>
+                ))}
+              </div>
+               {/* Content */}
+               <div className={`flex items-center gap-4 p-4 rounded-xl border bg-slate-800/50 border-slate-700`}>
+                  <div className="text-4xl">{ROLE_DETAILS[viewingHelpRole].icon}</div>
+                  <div>
+                      <div className="font-bold text-lg text-slate-200">{ROLE_DETAILS[viewingHelpRole].name}</div>
+                      <div className={`text-xs ${ROLE_DETAILS[viewingHelpRole].team === 'GOOD' ? 'text-blue-500' : 'text-red-500'}`}>
+                        {ROLE_DETAILS[viewingHelpRole].team === 'GOOD' ? '好人陣營' : '狼人陣營'}
+                      </div>
+                      <p className="text-sm mt-1 text-slate-400">{ROLE_DETAILS[viewingHelpRole].description}</p>
+                  </div>
+              </div>
+              <div className="space-y-6">
+                <section>
+                   <h3 className="text-amber-500 font-bold mb-2 flex items-center gap-2"><Activity size={18} /> 角色特色</h3>
+                   <ul className="list-disc list-inside space-y-1 text-sm text-slate-300">
+                     {ROLE_GUIDES[viewingHelpRole].features.map((f, i) => <li key={i}>{f}</li>)}
+                   </ul>
+                </section>
+                 <section>
+                   <h3 className="text-blue-500 font-bold mb-2 flex items-center gap-2"><Users size={18} /> 玩法策略</h3>
+                   <ul className="list-disc list-inside space-y-1 text-sm text-slate-300">
+                     {ROLE_GUIDES[viewingHelpRole].gameplay.map((g, i) => <li key={i}>{g}</li>)}
+                   </ul>
+                </section>
+                <section className="p-3 rounded border bg-slate-700/30 border-slate-700">
+                   <h3 className="text-red-500 font-bold mb-2 text-sm">注意事項</h3>
+                   <ul className="list-disc list-inside space-y-1 text-xs text-slate-400">
+                     {ROLE_GUIDES[viewingHelpRole].notes.map((n, i) => <li key={i}>{n}</li>)}
+                   </ul>
+                </section>
+              </div>
+            </div>
+          </Modal>
       </div>
     );
   }
 
-  const currentGuide = human ? ROLE_GUIDES[human.role] : null;
+  const currentGuide = ROLE_GUIDES[viewingHelpRole];
+  const currentRoleDetail = ROLE_DETAILS[viewingHelpRole];
 
   return (
     <div className={`min-h-screen flex flex-col md:flex-row overflow-hidden transition-colors duration-1000 ease-in-out ${isNight ? 'bg-slate-900 text-slate-200' : 'bg-slate-100 text-slate-900'}`}>
@@ -656,7 +729,13 @@ const App: React.FC = () => {
             <PlayerCard 
               key={player.id}
               player={player}
-              showRole={player.id === state.humanPlayerId || state.phase === GamePhase.GAME_OVER || !player.isAlive} 
+              showRole={
+                player.id === state.humanPlayerId || 
+                state.phase === GamePhase.GAME_OVER || 
+                !player.isAlive ||
+                // NEW LOGIC: Werewolves can see other werewolves
+                (human?.role === Role.WEREWOLF && player.role === Role.WEREWOLF)
+              } 
               isSelected={selectedTargetId === player.id}
               isNight={isNight}
               onClick={() => {
@@ -792,10 +871,44 @@ const App: React.FC = () => {
       <Modal 
         isOpen={showHelp} 
         onClose={() => setShowHelp(false)} 
-        title={`${human ? ROLE_DETAILS[human.role].name : '遊戲'} 玩法指南`}
+        title="角色玩法指南"
         isNight={isNight}
       >
-        {currentGuide ? (
+        <div className="space-y-4">
+          {/* Tab Navigation */}
+          <div className="flex flex-wrap gap-2 pb-2 border-b border-slate-700/20">
+            {(Object.values(Role) as Role[]).map(r => (
+              <button 
+                key={r}
+                onClick={() => setViewingHelpRole(r)}
+                className={`px-3 py-1 rounded-full text-xs font-bold transition-all ${
+                  viewingHelpRole === r 
+                  ? 'bg-amber-500 text-white shadow-md' 
+                  : (isNight ? 'bg-slate-800 text-slate-400 hover:bg-slate-700' : 'bg-slate-200 text-slate-600 hover:bg-slate-300')
+                }`}
+              >
+                {ROLE_DETAILS[r].name}
+              </button>
+            ))}
+          </div>
+
+          {/* Role Header Info */}
+          <div className={`flex items-center gap-4 p-4 rounded-xl border ${isNight ? 'bg-slate-800/50 border-slate-700' : 'bg-slate-50 border-slate-200'}`}>
+              <div className="text-4xl">{currentRoleDetail.icon}</div>
+              <div>
+                  <div className={`font-bold text-lg ${isNight ? 'text-slate-200' : 'text-slate-800'}`}>
+                    {currentRoleDetail.name}
+                  </div>
+                  <div className={`text-xs ${currentRoleDetail.team === 'GOOD' ? 'text-blue-500' : 'text-red-500'}`}>
+                    {currentRoleDetail.team === 'GOOD' ? '好人陣營' : '狼人陣營'}
+                  </div>
+                  <p className={`text-sm mt-1 ${isNight ? 'text-slate-400' : 'text-slate-600'}`}>
+                    {currentRoleDetail.description}
+                  </p>
+              </div>
+          </div>
+
+          {/* Guides */}
           <div className="space-y-6">
             <section>
                <h3 className="text-amber-500 font-bold mb-2 flex items-center gap-2">
@@ -822,9 +935,7 @@ const App: React.FC = () => {
                </ul>
             </section>
           </div>
-        ) : (
-          <p className={`text-center ${isNight ? 'text-slate-400' : 'text-slate-600'}`}>請先開始遊戲以查看角色指南。</p>
-        )}
+        </div>
       </Modal>
 
       {/* --- Game Over Result Modal --- */}
